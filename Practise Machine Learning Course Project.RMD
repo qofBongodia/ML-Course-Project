@@ -1,0 +1,115 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Rebecca Shen"
+date: "April 26, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(lattice)
+library(ggplot2)
+
+```
+
+## Project Scope
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement ??? a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data Preperation
+
+```{r}
+trainurl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testurl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(trainurl, destfile = "train.csv")
+download.file(testurl, destfile = "test.csv")
+train_dat = read.csv("train.csv")
+test_dat =read.csv("test.csv")
+dim(train_dat)
+```
+
+```{r}
+dim(test_dat)
+```
+
+### data cleansing
+
+```{r}
+#get rid of rows that have too many NAs.
+clean_index <-colSums(is.na(train_dat))/nrow(train_dat)<0.90
+clean_train_data <-train_dat[,clean_index]
+clean_test_data <-test_dat[,clean_index]
+
+#remove variables which are having nearly zero variables.
+nzv <-nearZeroVar(clean_train_data)
+clean_train_data <-clean_train_data[,-nzv]
+clean_test_data <-clean_test_data[, -nzv]
+
+##remove first few non numerical columns
+clean_train_data <-clean_train_data[,8:59]
+clean_test_data <-clean_test_data[,8:59]
+
+dim(clean_train_data)
+```
+
+```{r}
+dim(clean_test_data)
+```
+
+
+### partition the data into training and cross validation set
+partition the training data into two datasets. One for building the model and one for cross validation. 
+```{r}
+inTrainIndex <-createDataPartition(clean_train_data$classe, p=0.6, list=FALSE)
+training_set <-clean_train_data[inTrainIndex,]
+t_validate_set <-clean_train_data[-inTrainIndex,]
+```
+
+##Model Selection
+In order to find the most accurate model to predict the data, we test the accuracy using different models.
+
+###Random Forest Method
+```{r}
+set.seed(25621)
+
+##model fitting
+modRF <-train(classe ~., data=training_set, method="rf")
+
+##prediction
+predRF <-predict(modRF, t_validate_set)
+cmRF <-confusionMatrix(t_validate_set$classe, predRF)
+cmRF
+```
+From the Random Forest Model we see the prediction accuracy is 99%. This is nearly 100% accuracy.
+
+###GBM Method
+```{r}
+set.seed(25621)
+#training the model
+modGBM <-train(classe ~., data=training_set, method='gbm')
+
+#prediction using gbm.
+predGBM <-predict(modGBM, t_validate_set)
+
+cmGBM <-confusionMatrix(t_validate_set$classe,predGBM )
+cmGBM
+
+```
+We see prediction accuracy is 96% from the gbm model, which is less than the random forest model.
+
+```{r}
+##Both models reach to a high accuracy level. below is a comparasion of both models.
+cmRF$overall
+```
+
+```{r}
+cmGBM$overall
+```
+
+##Conclusion
+From the analysis, Random Forest is better for this prediction with higher accuracy level.
+
+##using the selected model on testing data.
+```{r}
+predict(modRF, clean_test_data)
+```
